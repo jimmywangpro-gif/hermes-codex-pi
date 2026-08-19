@@ -52,6 +52,34 @@ hermes skills install https://raw.githubusercontent.com/jimmywangpro-gif/hermes-
 
 > 安裝後需**新開 session** 才會載入（skill loader 於 session 啟動時初始化）。
 
+## 專案母版（AGENT-HERMES.md / AGENT-CODEX.md）
+
+本 repo 的 `templates/` 內附兩份**協作協議母版**，用於在目標平台的專案內建立協作規範：
+
+| 檔案 | 對象 | 內容 |
+|---|---|---|
+| `templates/AGENT-HERMES.md` | Hermes | 角色分工、11 步執行流程、5 層驗證（L1–L5）、no-idle、清理 worktree |
+| `templates/AGENT-CODEX.md` | Codex CLI | 8 條絕對規則（範圍邊界、read-first、TDD gate、SELF-TEST 交付前置、commit 格式） |
+
+**SKILL.md 與母版的關係：**
+- `SKILL.md` — 操作手冊，Hermes 讀：什麼時候做什麼、怎麼驗證、怎麼處理 failure。
+- `AGENT-*.md` — 專案規範，Hermes 與 Codex 都讀（Codex 透過 prompt 或專案根目錄的 `AGENT-CODEX.md`）。
+
+### 使用方式（在目標專案建立母版）
+
+```bash
+# 在目標專案根目錄執行（以 repo 內 templates/ 為來源）
+cp templates/AGENT-HERMES.md .
+cp templates/AGENT-CODEX.md .
+
+# 或：在專案根目錄執行 install.sh --agents
+/path/to/hermes-codex-orchestration/install.sh --agents
+```
+
+> **重要**：`templates/` 是**母版**。建議每個專案複製後**依專案修改**（如加 Docker/.NET 規範、多 subagent 規範），不要直接改共享母版——每個專案的 `AGENT-*.md` 是專案專屬版本。
+
+> 若目標平台已有專案 symlink 指向共享母版，沿用該專案既有方式即可，不必重複建立。
+
 ## 前置需求
 
 - [Hermes Agent](https://hermes-agent.nousresearch.com)（安裝於目標平台）
