@@ -125,6 +125,16 @@ Then run the layers:
 re-run from L1. L1-L4 all PASS required before merge. L5 FAIL: Hermes decides
 revert or fix.
 
+**L1 supplemental scan (optional)** — `code-review-sr` local-only static
+analysis as auxiliary evidence, does NOT replace the L1-L5 flow:
+- Tool: `~/.hermes/skills/code-review-sr/src/code-review.js` (Node module,
+  local-only build: regex analysis only, no network, no API key, no data leaves
+  the machine)
+- Run `reviewDir(<delivery dir>)` over the delivered files; high-severity hits
+  can be grounds for sendback, but no hits does NOT mean clean — L3 tests
+  remain authoritative
+- If the tool is missing or fails, skip it; never block L1-L5 on it
+
 ---
 
 ## 7. Failure Modes
