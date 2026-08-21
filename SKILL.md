@@ -1,17 +1,17 @@
 ---
-name: hermes-codex-orchestration
-description: Coding Hermes orchestrates Codex codes Hermes verifies.
+name: hermes-codex-pi
+description: Coding Hermes orchestrates Codex/pi codes Hermes verifies.
 version: 1.0.0
 author: Hermes
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [coding, codex, orchestration, review, verification]
+    tags: [coding, codex, pi, orchestration, review, verification]
     related_skills: [codex, karpathy-coding-standards]
 ---
 
-# Hermes 編排 + Codex 寫碼 + Hermes 驗證 工作流
+# Hermes 編排 + Codex/pi 寫碼 + Hermes 驗證 工作流
 
 ## When to Use
 
@@ -37,8 +37,8 @@ Hermes (review/test/驗證) ◀──交付── 完成
 
 ## 前置準備
 
-1. 確認 Codex CLI 可用：`codex --version`；gh 已認證（`gh auth status`）
-2. 載入 `codex` skill（autonomous-ai-agents/codex）取得 Codex 啟動細節
+1. 確認執行者 CLI 可用：Codex `codex --version`；pi `pi --version`；gh 已認證（`gh auth status`）
+2. 載入 `codex` skill（autonomous-ai-agents/codex）取得 Codex 啟動細節；pi 啟動細節見本 skill Phase 3.5
 3. 確認專案 git 狀態乾淨（`git status`）
 4. 確認 test 執行環境（venv / dotnet / 等）
 
@@ -94,6 +94,23 @@ terminal(background=true, pty=true, workdir=<專案路徑>, notify_on_complete=t
 - 用背景 + pty 啟動 Codex
 - `notify_on_complete=true` 讓 Hermes 在 Codex 完成時收到通知
 - 記錄 session_id
+
+### Phase 3.5 — 啟動 pi（替代執行者）
+
+當使用者指定或 Codex 不可用時，改用 pi（earendil-works pi-coding-agent）：
+
+```
+pi -p --provider ollama --model <model-id> --thinking xhigh \
+   --session-dir /path/to/worktree/.pi-sessions \
+   --append-system-prompt /path/to/AGENT-PI.md \
+   "<prompt>"
+```
+
+- **非互動批次**：`-p` 處理 prompt 後即退出（已實測可用）
+- **模型**：`--provider ollama`（本機）或 `openai-codex`（雲端 OAuth）；`--model` 明確指定
+- **規範注入**：`--append-system-prompt AGENT-PI.md` 讓 pi 讀取協作協議
+- **session 管理**：`--session-dir` 指向 worktree 專屬目錄，避免跨專案 session 污染；或 `--no-session` 一次性執行
+- **交付要求**：與 Codex 相同 — SELF-TEST 前置、UNVERIFIED 標記、L1-L5 驗證流程不變
 
 ### Phase 4 — 驗證（Hermes review/test/驗證）★核心
 
@@ -260,6 +277,20 @@ codex exec --model gpt-5.6-luna -c 'model_reasoning_effort="xhigh"' --sandbox da
 - `gpt-5.6-luna` + `xhigh` reasoning 是指定配置，不依賴本機預設值
 - `--skip-git-repo-check` 在 worktree 可能需要（視 Codex 版本）
 - capacity exit 時重試同一命令即可
+
+### pi CLI 命令格式（指定 provider + model + thinking）
+
+```
+pi -p --provider ollama --model deepseek-v4-flash:0731-cloud --thinking xhigh \
+   --session-dir <worktree>/.pi-sessions \
+   --append-system-prompt <project>/AGENT-PI.md "<prompt>"
+```
+
+- 本機通道：`--provider ollama`（`http://127.0.0.1:11434/v1`，與 Hermes 共用）
+- 雲端通道：`--provider openai-codex`（OAuth，`pi auth check --provider openai-codex` 驗證）
+- 認證過期（OAuth 約 10 天）→ 重新授權，不重試硬撞
+- 優先使用 `--thinking xhigh`（對應 Codex 的 extra high 等級）
+- `--append-system-prompt AGENT-PI.md` 為強制：把 pi 協作協議注入 system prompt
 
 ## Pitfalls
 

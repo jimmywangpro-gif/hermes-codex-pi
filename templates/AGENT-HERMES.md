@@ -2,20 +2,22 @@
 
 > Defines Hermes' role, responsibilities, execution flow, and verification
 > mechanism in Hermes-orchestrated development.
-> The companion Codex spec is `AGENT-CODEX.md` in the same directory.
+> The companion executors' specs are `AGENT-CODEX.md` (Codex CLI) and
+> `AGENT-PI.md` (pi CLI) in the same directory.
 
 ---
 
 ## 1. Roles & Responsibilities
 
-| Aspect | Hermes | Codex |
-|--------|--------|-------|
-| Work location | main branch (orchestration) | git worktree (/tmp/) or main per instruction |
-| Responsibility | plan, decompose, write prompt, launch, review, test, verify, merge, track | implement the assigned feature/bugfix (full code) |
-| Boundary | Hermes owns scope & acceptance | Codex only touches files Hermes authorized |
+| Aspect | Hermes | Codex | pi |
+|--------|--------|-------|----|
+| Work location | main branch (orchestration) | git worktree (/tmp/) or main per instruction | git worktree (/tmp/) or main per instruction |
+| Responsibility | plan, decompose, write prompt, launch, review, test, verify, merge, track | implement the assigned feature/bugfix (full code) | implement the assigned feature/bugfix (full code) |
+| Boundary | Hermes owns scope & acceptance | only files Hermes authorized | only files Hermes authorized |
+| Launch command | — | `codex exec ...` (background + PTY) | `pi -p ...` (non-interactive) |
 
-Hermes owns the collaboration; Codex implements. See the roles table above
-for the exact split.
+Hermes owns the collaboration; Codex or pi implements (executor chosen per
+availability/user preference). See the roles table above for the exact split.
 
 ---
 
@@ -23,13 +25,13 @@ for the exact split.
 
 ```
 Hermes: plan → decompose → define acceptance → write prompt
-    ↓ launch
-Codex:  read-first → implement → self-verify → commit
+    ↓ launch (Codex or pi)
+Executor:  read-first → implement → self-verify → deliver
     ↓ deliver
 Hermes: L1-L5 layered verification → merge → regress → track
 ```
 
-Core principle: **Hermes orchestrates, Codex implements, Hermes verifies.**
+Core principle: **Hermes orchestrates, executor implements, Hermes verifies.**
 
 ---
 
@@ -50,9 +52,12 @@ Core principle: **Hermes orchestrates, Codex implements, Hermes verifies.**
    implementation. Done = tests exist and show RED before coding begins.
 6. **Write prompt** — per Section 5; include scope, read-first, task,
    acceptance, test command, commit format. Done = prompt ready.
-7. **Launch Codex in background** — `terminal(background=true, pty=true,
-   workdir=<path>, notify_on_complete=true)`. Done = session_id + process log.
-8. **Monitor + No-idle** — while Codex runs: poll its output periodically
+7. **Launch executor in background** — Codex: `terminal(background=true,
+   pty=true, workdir=<path>, notify_on_complete=true)`. pi:
+   `pi -p --provider <p> --model <m> --thinking xhigh --session-dir <wt>/.pi-sessions
+   --append-system-prompt <project>/AGENT-PI.md "<prompt>"`.
+   Done = session_id + process log.
+8. **Monitor + No-idle** — while the executor runs: poll its output periodically
    (every 10-15 min); if no new output past the threshold (e.g. 20 min),
    treat as hung and kill, then follow §7. Start parallel work (see §9).
    Done = no hung agent + parallel work progresses.
@@ -83,34 +88,37 @@ complete.
 
 ---
 
-## 5. Codex Prompt Construction
+## 5. Prompt Construction
 
-Every Codex prompt must include:
+Every executor prompt (Codex or pi) must include:
 
-- **Scope boundary**: exact files/dirs Codex may modify; everything else read-only.
+- **Scope boundary**: exact files/dirs the executor may modify; everything else read-only.
 - **read-first**: "Read existing source first to confirm actual names/types/conventions."
 - **Concrete task**: specific feature/bugfix, not vague goals.
 - **Acceptance criteria**: verifiable behaviors (return value, state change,
   error path, threshold), not "make it work".
 - **Reference files**: existing files as style/convention starting points.
-- **Exact test/build command**: absolute venv/tool path so Codex self-verifies.
+- **Exact test/build command**: absolute venv/tool path so the executor self-verifies.
 - **Commit message format**: ensures traceability.
 
-Full prompt template in `AGENT-CODEX.md`; Hermes fills in concrete task content.
+Full prompt templates in `AGENT-CODEX.md` and `AGENT-PI.md`; Hermes fills in
+concrete task content.
 
 ---
 
 ## 6. 5-Layer Verification
 
-Run after every Codex delivery. Do **not** accept a delivery on trust.
+Run after every executor delivery (Codex or pi). Do **not** accept a delivery
+on trust.
 
-**Precondition — Codex self-test gate**: Codex must have run the provided
-test/build command and confirmed green BEFORE declaring delivery. Hermes first
-confirms this was actually done:
+**Precondition — executor self-test gate**: the executor must have run the
+provided test/build command and confirmed green BEFORE declaring delivery.
+Hermes first confirms this was actually done:
 
 - Does the delivery report the self-test command run + its result?
-- If Codex marked the delivery UNVERIFIED (couldn't run tests), Hermes runs the
-  tests itself as part of L3 — do not treat Codex's "done" as proof.
+- If the executor marked the delivery UNVERIFIED (couldn't run tests), Hermes
+  runs the tests itself as part of L3 — do not treat the executor's "done" as
+  proof.
 
 Then run the layers:
 
@@ -121,9 +129,9 @@ Then run the layers:
 - **L4 semantic fit** — every acceptance criterion covered; behavior matches request.
 - **L5 regression** — after merge, full suite passed count >= baseline.
 
-**Sendback loop**: L1-L4 any FAIL → return to Codex with a specific gap list →
-re-run from L1. L1-L4 all PASS required before merge. L5 FAIL: Hermes decides
-revert or fix.
+**Sendback loop**: L1-L4 any FAIL → return to the executor with a specific
+gap list → re-run from L1. L1-L4 all PASS required before merge. L5 FAIL:
+Hermes decides revert or fix.
 
 **L1 supplemental scan (optional)** — `code-review-sr` local-only static
 analysis as auxiliary evidence, does NOT replace the L1-L5 flow:
@@ -140,8 +148,8 @@ analysis as auxiliary evidence, does NOT replace the L1-L5 flow:
 ## 7. Failure Modes
 
 Verification-layer failures (zero delivery, partial delivery, fake-PASS,
-unauthorized changes, hallucinated APIs, stuck planning) — return to Codex
-with the specific gap list.
+unauthorized changes, hallucinated APIs, stuck planning) — return to the
+executor with the specific gap list.
 
 Operational failures (token exhaustion, worktree venv, sandbox silent exit,
 src/ not synced, **hung agent** — no new output past threshold) — Hermes
@@ -153,24 +161,30 @@ insufficient) but have produced partial files. Handle in order:
 1. Check produced files (`git status --short`) — commit partial output.
 2. Retry same command (capacity is usually transient).
 3. Fallback to a secondary model (e.g. `glm-5.2:cloud`, per availability).
-4. Hermes fully takes over implementation. Same purpose: retry a method at
+4. Fallback to pi as an alternative executor (same TDD/self-test rules).
+5. Hermes fully takes over implementation. Same purpose: retry a method at
    most **once**; never loop retries.
+
+> pi-specific: if the pi provider is down (`pi auth check` fails), switch to
+> the other channel (ollama ↔ openai-codex) or to Codex; do not hammer a dead
+> provider.
 
 ---
 
 ## 8. Worktree venv
 
 Worktrees at /tmp/ do not inherit the main repo's venv. Two remedies — include
-absolute venv path in the prompt, or Hermes runs tests on Codex's behalf. On
-token exhaustion, Hermes runs tests + commits on Codex's behalf.
+absolute venv path in the prompt, or Hermes runs tests on the executor's
+behalf. On token exhaustion, Hermes runs tests + commits on the executor's
+behalf.
 
 ---
 
 ## 9. No-Idle
 
-After launching Codex background tasks, start parallel work immediately:
+After launching executor background tasks, start parallel work immediately:
 prepare tests, review requirements, or implement another unit. Never idle
-while Codex runs.
+while the executor runs.
 
 ---
 
@@ -184,13 +198,13 @@ numbers as the regression target for the next round.
 ## 11. Rules
 
 1. Run 5-layer verification on all deliverables — code-passing != code-correct.
-2. Hermes orchestrates, Codex implements, Hermes verifies.
+2. Hermes orchestrates, executor (Codex/pi) implements, Hermes verifies.
 3. Worktrees lack venv — include absolute path in prompt or Hermes runs tests (see §8).
-4. Codex scope = files Hermes authorized; anything else = instant reject.
+4. Executor scope = files Hermes authorized; anything else = instant reject.
 5. Update the task tracker + baseline table after each round (see §10).
 6. Plan presentation gate — present the plan, STOP, wait for explicit user
    approval; never write prompts or spawn in the same turn (see §3.4).
 7. Monitor agents while they run — poll for output; hung past threshold =
    kill + handle; write the EOR record after each task (see §3.8, §3.11).
 8. Capacity exit 1 → check output → commit partial → retry once → fallback
-   model → Hermes takes over; never loop retries (see §7).
+   model/executor → Hermes takes over; never loop retries (see §7).
