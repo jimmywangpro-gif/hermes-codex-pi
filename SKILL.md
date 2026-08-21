@@ -15,9 +15,9 @@ metadata:
 
 ## When to Use
 
-- 使用者說「任何 coding 項目由 Hermes orchestrated、交付 Codex coding、完成後 Hermes review/test/驗證」
-- 開始任何實作型 coding 任務，且 Codex CLI 可用
-- 需要將實作委派給 Codex 並確保品質
+- 使用者說「任何 coding 項目由 Hermes orchestrated、交付 Codex/pi coding、完成後 Hermes review/test/驗證」
+- 開始任何實作型 coding 任務，且 Codex 或 pi CLI 可用
+- 需要將實作委派給執行者（Codex 預設；pi 為替代）並確保品質
 
 ## 用途
 
@@ -72,7 +72,7 @@ Hermes (review/test/驗證) ◀──交付── 完成
 
 > 測試碼可由 Hermes 撰寫，或由 Codex 在第一趟只寫測試（確認 RED）、第二趟才實作。不論誰寫，**測試碼必須先於實作碼存在且確認 RED**。
 
-### Phase 2 — 撰寫 Codex Prompt
+### Phase 2 — 撰寫執行者 Prompt（Codex 預設 / pi 替代）
 
 每個 Codex prompt 必須包含：
 - **角色**：「你是實作工程師，負責完整實作 <任務>」
@@ -80,11 +80,11 @@ Hermes (review/test/驗證) ◀──交付── 完成
 - **read-first**：先讀現有程式碼確認實際屬性/型別/命名，再動手
 - **具體任務**：backlog item / 明確功能，非模糊目標
 - **驗收標準**：具體斷言期望（回傳值、狀態、錯誤處理、閾值）
-- **測試命令**：含絕對路徑的測試指令，讓 Codex 能自我驗證
+- **測試命令**：含絕對路徑的測試指令，讓執行者能自我驗證
 - **SELF-TEST 交付前置**：「交付前必須先執行測試指令並確認通過；無法執行時標記 UNVERIFIED，不得宣稱通過」
-- **commit 格式**：確保可追溯
+- **commit 格式**：確保可追溯（pi 交付為檔案變更 + 回報，commit 可由 Hermes 執行）
 
-> 若專案有 `AGENT-CODEX.md`，直接套用其 prompt 模板並填寫具體任務內容。
+> 若專案有 `AGENT-CODEX.md` 或 `AGENT-PI.md`，直接套用其 prompt 模板並填寫具體任務內容。
 
 ### Phase 3 — 啟動 Codex
 
