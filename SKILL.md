@@ -139,6 +139,15 @@ Codex 交付後，**不得直接接受**。先確認 **Codex 已自我測試**�
 
 > **權威來源**：`codex` skill 的 `references/codex-deliverable-verification.md` — 含每層具體命令、退回迴圈規則、失敗模式對策表。本 skill 不重複；以下僅列出編排層獨有的注意事項。
 
+**L4-E2E（真實環境驗證）— Node 單元測試的盲區補丁（2026-09-05 stock 實證）★**：
+
+單元測試全綠 ≠ 真實環境正常。兩類缺陷 Node 測試結構性抓不到，前端/圖表類交付必須以真實瀏覽器 E2E（如 Chrome CDP headless）作為 L4 硬閘門：
+
+1. **WebIDL receiver 陷阱**：全域 `setTimeout/clearTimeout` 抽進物件屬性未 bind → 瀏覽器丟 `TypeError: Illegal invocation`，Node 的 setTimeout 對 receiver 寬容故測不到。預防：DI fallback 建構處一律 `.bind(globalThis)`，禁止提升到 module 頂層 bind。
+2. **圖表/第三方庫內部斷言**：如 lightweight-charts `setData` 要求 time 嚴格遞增唯一——tick 級時間戳映射到秒後同秒兩點即炸內部斷言（訊息如 `Value is null` 不直指原因）。預防：任何資料餵入 vendored 套件前，以最小樣本驗 API 契約；映射序列先去重（同秒 last-wins）。
+
+E2E 最低標：Chrome `--headless=new --remote-debugging-port=<port>` + CDP 監聽 `Runtime.exceptionThrown` / `Log.entryAdded` / `Network.responseReceived`，斷言 console/runtime/network **零錯誤**＋核心互動（渲染、選取、切換主題、儲存）逐項 PASS。腳本模式存 stock 專案 /tmp/stock-cdp-e2e.mjs 可複用。
+
 **Review 迭代迴圈（2026-09-05 老大指示）★**：
 
 1. 執行者（pi/codex）交付後，**必須先送 codex review**（開獨立 tab，v2 輪起），Hermes 不得在 codex review 之前就自行驗證結案。
@@ -146,6 +155,7 @@ Codex 交付後，**不得直接接受**。先確認 **Codex 已自我測試**�
 3. **不設固定 review 輪數上限**：pi↔codex 持續修復／複審直到達成共識；不得因「已跑兩輪」就在仍有有效 finding 時結案。若雙方對同一 finding 產生無法以測試或原始碼證據消解的實質分歧，才把雙方證據呈交老大裁決。
 4. Hermes 在迴圈中的職責：分派 findings 給 pi 修復（Hermes 只在 pi 失敗/卡死時接手）、代跑被 sandbox 擋住的測試、驗證 findings 是否屬實（防 codex 誤報——誤報時帶證據回 codex 對質而非盲目修）、最終 L1-L5 + E2E。
 5. 踩坑記錄：v1 輪曾跳過 codex review 直接 Hermes 驗證結案（被老大指正）；v2 輪起此為硬閘門，且迭代主體是 pi↔codex，Hermes 是裁判不是修理工。
+6. **一修一審 1:1**（2026-09-05 老大指正「為什麼沒 codex 驗證」）：每輪修復後立即送 codex 複審，不合併輪次。codex usage limit / capacity 中斷時切 ollama 通道補審（見 Model Capacity 節），**不**以「Hermes 已另行驗證」抵免 codex 複審；Hermes 的 L4-E2E 是獨立補強證據（codex read-only sandbox 跑不了瀏覽器/server），不取代靜態複審。
 
 **編排層額外要求**：
 - **TDD gate 回顧** — L3 時確認 Phase 1.5 的測試碼已被實作覆蓋為 GREEN，不是事後補寫的測試
@@ -357,8 +367,15 @@ codex exec --model gpt-5.6-luna -c 'model_reasoning_effort="xhigh"' --sandbox da
 **Ollama 模式（本機通道，已實測可用）**：
 
 ```
+# 慣用（2026-09-05 stock 實測，review 場景）：
+codex exec --model deepseek-v4-flash:0731-cloud -c 'model_reasoning_effort="max"' -c 'model_provider="ollama"' --sandbox read-only "<prompt>"
+# 舊法（亦可用）：
 codex exec --oss --local-provider ollama --model glm-5.2:cloud --skip-git-repo-check "<prompt>"
 ```
+
+- **reasoning 值陷阱**：ollama API 只收 `max/high/medium/low/none`，`xhigh` 會在長任務尾端炸 `invalid reasoning value` + Reconnecting 5 次 exit 1——ollama 通道一律用 `model_reasoning_effort="max"`，且以 `-c` 覆寫不依賴 ~/.codex/config.toml 預設
+- **`model_provider="ollama"` 需在 ~/.codex/config.toml 有對應 `[model_providers.ollama]` 區段**（base_url 指向 ollama /v1）；若無，用舊法 `--oss --local-provider ollama`
+- exit 1 斷在回報階段時程式碼常已寫畢——先 `git status` 盤點再決定接手
 
 - codex 0.148.0 不支援 `--provider` 參數，必須用 `--oss --local-provider ollama`
 - 設定檔 `~/.codex/ollama-launch.config.toml`：定義 provider `ollama-launch`（`wire_api = "responses"`，ollama 已支援 responses API，實測回 `status: completed`）；檔內 `model` 預設值會隨使用調整（2026-09 現況為 `deepseek-v4-flash:0731-cloud`），故命令一律明確指定 `--model`，不可依賴設定檔預設
@@ -401,6 +418,11 @@ pi -p --provider ollama --model deepseek-v4-flash:0731-cloud --thinking xhigh \
 - **未問模型即啟動** — 跳過 Phase 0 模型選擇 Gate，依 skill 記載的預設模型直接 spawn；每次 skill 觸發都必須先以 clarify 詢問使用者本次執行者模型與 reasoning。
 - **缺執行記錄** — 任務結束未落盤 EOR，事後無法追溯「誰做了什麼、測了什麼」；每個 Codex 任務結束必寫 `docs/exec/<task-id>.md`。
 - **跳過 codex review 直接結案** — 執行者交付後 Hermes 自行驗證就結案，繞過 codex review（2026-09-05 老大指正）；正確流程＝交付→codex review→修復迭代→共識（codex PASS + Hermes L1-L5 綠）才結案，見 Phase 4 Review 迭代迴圈。
+- **修復輪與 review 輪合併** — 兩輪修復才送一次 review（2026-09-05 老大指正「為什麼沒 codex 驗證」）；每輪修復後**立即**送 codex 複審，一修一審 1:1，不合併輪次。
+- **執行者空轉/pane 不執行** — herdr pane run 後程序未起（pgrep 無進程）或 pi 翻找自己 session 檔零修改；偵測＝5 秒內 pgrep 驗證程序已起＋預期產出檔案 mtime/測試數變化；作廢改開新 tab 重派，同目的不重試第二次（斷路器）。
+- **採信執行者自述** — pi/codex 回報的測試數/RED 證據必須以 Hermes 獨立重跑核對，不採信自述（尤其 node --test 計數與 git diff 僅追加）。
+- **審查報告被 pane 截斷就猜內容** — codex 長報告用 session 檔（~/.codex/sessions/<date>/rollout-*.jsonl，stat -mmin 找最新，Python parse response_item/message）取全文，pane read 只用來判 RUNNING/DONE。
+- **長 prompt 直接寫在 herdr pane run 參數** — 引號/跳脫易錯；prompt 檔案化到 docs/prompts/*.md，pane run 只下「Read docs/prompts/X.md and execute it fully」短句。
 
 ## 驗證命令範例
 
