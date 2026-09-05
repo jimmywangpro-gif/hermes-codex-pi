@@ -142,10 +142,10 @@ Codex 交付後，**不得直接接受**。先確認 **Codex 已自我測試**�
 **Review 迭代迴圈（2026-09-05 老大指示）★**：
 
 1. 執行者（pi/codex）交付後，**必須先送 codex review**（開獨立 tab，v2 輪起），Hermes 不得在 codex review 之前就自行驗證結案。
-2. Codex review 產出 findings 後進入**迭代迴圈**：修復（pi/Hermes 依 findings 分工）→ 再送 codex 複審 → 重複直到 **codex VERDICT: PASS 且 Hermes L1-L5 全綠**（兩者共識）。
+2. **coding（pi）與 review（codex）需不斷迭代直到達成共識**：codex findings → pi 修復 → codex 複審 → 重複，直到 codex 無新增 findings 且 **VERDICT: PASS**；Hermes 跑 L1-L5 全綠即共識成立。
 3. 迭代上限：同一交付最多 **2 輪** codex review；第 3 輪仍有分歧時，老大裁決，不得無限迭代。
-4. Hermes 在迴圈中的職責：代跑被 sandbox 擋住的測試、驗證 findings 是否屬實（防 codex 誤報）、執行修復或分派修復、最終 L1-L5 + E2E。
-5. 踩坑記錄：v1 輪曾跳過 codex review 直接 Hermes 驗證結案（被老大指正）；v2 輪起此為硬閘門。
+4. Hermes 在迴圈中的職責：分派 findings 給 pi 修復（Hermes 只在 pi 失敗/卡死時接手）、代跑被 sandbox 擋住的測試、驗證 findings 是否屬實（防 codex 誤報——誤報時帶證據回 codex 對質而非盲目修）、最終 L1-L5 + E2E。
+5. 踩坑記錄：v1 輪曾跳過 codex review 直接 Hermes 驗證結案（被老大指正）；v2 輪起此為硬閘門，且迭代主體是 pi↔codex，Hermes 是裁判不是修理工。
 
 **編排層額外要求**：
 - **TDD gate 回顧** — L3 時確認 Phase 1.5 的測試碼已被實作覆蓋為 GREEN，不是事後補寫的測試
