@@ -278,6 +278,21 @@ codex exec --model gpt-5.6-luna -c 'model_reasoning_effort="xhigh"' --sandbox da
 - `--skip-git-repo-check` 在 worktree 可能需要（視 Codex 版本）
 - capacity exit 時重試同一命令即可
 
+**Ollama 模式（本機通道，已實測可用）**：
+
+```
+codex exec --oss --local-provider ollama --model glm-5.2:cloud --skip-git-repo-check "<prompt>"
+```
+
+- codex 0.148.0 不支援 `--provider` 參數，必須用 `--oss --local-provider ollama`
+- 設定檔 `~/.codex/ollama-launch.config.toml`：定義 provider `ollama-launch`（`wire_api = "responses"`，ollama 已支援 responses API，實測回 `status: completed`）；檔內 `model` 預設值會隨使用調整（2026-09 現況為 `deepseek-v4-flash:0731-cloud`），故命令一律明確指定 `--model`，不可依賴設定檔預設
+- 已知非致命警告（不影響執行，但每次啟動會刷出）：
+  - `failed to refresh available models: missing field 'models'` — codex 期待 `/v1/models` 回 `{"models":[...]}`，ollama 回 OpenAI 格式 `{"object":"list","data":[...]}`
+  - `Model metadata for glm-5.2:cloud not found. Defaulting to fallback metadata` — 效能可能略降
+- 適用場景：雲端 `gpt-5.6-luna` capacity 不足時的 fallback 鏈次選（與 pi ollama 通道共用同一本機 ollama）
+- **完整工具鏈已實測（2026-08-22）**：寫檔 + 執行測試 + 回報正常，Hermes 獨立核對檔案內容與測試結果一致
+- ⚠️ **approval 坑**：`approval_policy = "on-request"` 下，codex 執行 shell 命令（寫檔、跑測試）會觸發 approval 請求；非互動批次（`codex exec`）中該請求會卡住直到 timeout。實測解法：Hermes 以 `terminal` 啟動時由使用者批准，或改用 `--sandbox danger-full-access`（skill 雲端模式已在用）避免逐次批准
+
 ### pi CLI 命令格式（指定 provider + model + thinking）
 
 ```
@@ -291,6 +306,8 @@ pi -p --provider ollama --model deepseek-v4-flash:0731-cloud --thinking xhigh \
 - 認證過期（OAuth 約 10 天）→ 重新授權，不重試硬撞
 - 優先使用 `--thinking xhigh`（對應 Codex 的 extra high 等級）
 - `--append-system-prompt AGENT-PI.md` 為強制：把 pi 協作協議注入 system prompt
+
+**pi + glm-5.2:cloud 已實測可用（2026-08-22）**：完整工具鏈（寫檔 → 執行測試 → 回報）正常，`pi auth check --provider ollama` → ready。`~/.pi/agent/models.json` 已註冊 `glm-5.2:cloud`（contextWindow 1000000、reasoning: true）。注意 `settings.json` 的 `defaultModel` 是 `deepseek-v4-flash:0731-cloud`，協同流程必須明確指定 `--model glm-5.2:cloud`，不可依賴預設。
 
 ## Pitfalls
 
