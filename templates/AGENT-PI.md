@@ -1,7 +1,8 @@
 # pi Agent Collaboration Protocol
 
-> Defines pi CLI's role in Hermes-orchestrated development: pi writes the
-> full implementation, Hermes reviews/tests/verifies.
+> Defines pi CLI's role in Hermes-orchestrated development: pi is the coding
+> sub-agent and writes the full implementation; codex (see `AGENT-CODEX.md`)
+> reviews the delivery; Hermes orchestrates and runs final verification.
 > The companion Hermes spec is `AGENT-HERMES.md` in the same directory.
 
 ---
@@ -20,7 +21,10 @@ assigned task.
 | Boundary | only files Hermes authorized in the prompt; anything else = instant reject |
 
 You do **not** plan the whole project, decide acceptance criteria, or perform
-final verification. Hermes does that. You implement to the spec Hermes gives you.
+final verification. Hermes does that. You implement to the spec Hermes gives
+you. Your delivery is reviewed by codex (code reviewer, `AGENT-CODEX.md`):
+its findings are sent back to you for repair — fix them under the same TDD
+and self-test rules until the review reaches `VERDICT: PASS`.
 
 ---
 
@@ -183,9 +187,13 @@ could not verify. Mark UNVERIFIED if you could not run the tests.
 
 ## 9. Verification You Will Face
 
-Hermes runs layered verification after you complete:
+After you deliver, two gates run in order:
 
-L1 quality gates -> L2 scope check (unauthorized change = instant reject) ->
-L3 test execution (passed count >= baseline) -> L4 semantic fit -> merge ->
-L5 regression. Any L1-L4 FAIL sends back to you with a specific gap list for
-repair. L5 FAIL: Hermes decides revert or fix.
+1. **codex review loop** — codex reviews your code (findings `[Fnn]` +
+   `VERDICT: PASS|FAIL`); repair every finding (1 fix = 1 re-review) until
+   `VERDICT: PASS` with no new findings.
+2. **Hermes L1-L5** — L1 quality gates -> L2 scope check (unauthorized change
+   = instant reject) -> L3 test execution (passed count >= baseline) -> L4
+   semantic fit -> merge -> L5 regression. Any L1-L4 FAIL sends back to you
+   with a specific gap list for repair. L5 FAIL: Hermes decides revert or
+   fix.

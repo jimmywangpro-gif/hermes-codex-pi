@@ -1,6 +1,6 @@
 ---
 name: hermes-codex-pi
-description: Coding Hermes orchestrates Codex/pi codes Hermes verifies.
+description: Coding Hermes orchestrates; pi codes; codex reviews; Hermes verifies.
 version: 1.0.0
 author: Hermes
 license: MIT
@@ -11,20 +11,20 @@ metadata:
     related_skills: [codex, karpathy-coding-standards]
 ---
 
-# Hermes 編排 + Codex/pi 寫碼 + Hermes 驗證 工作流
+# Hermes 編排 + pi coding + codex review + Hermes 驗證 工作流
 
 ## When to Use
 
-- 使用者說「任何 coding 項目由 Hermes orchestrated、交付 Codex/pi coding、完成後 Hermes review/test/驗證」
-- 開始任何實作型 coding 任務，且 Codex 或 pi CLI 可用
-- 需要將實作委派給執行者（Codex 預設；pi 為替代）並確保品質
+- 使用者說「任何 coding 項目由 Hermes orchestrated、pi coding、codex review、完成後 Hermes review/test/驗證」
+- 開始任何實作型 coding 任務，且 pi 與 codex CLI 可用
+- 角色分工：**Hermes = orchestration、pi = coding、codex = code review**；Hermes 負責最終驗證
 
 ## 用途
 
 任何 coding 專案（新專案、功能、修 bug）的通用協同模式：
 
 ```
-Hermes (編排) ──規劃/拆解/定義驗收──▶ coding sub-agent（Codex 預設 / pi 替代）
+Hermes (編排) ──規劃/拆解/定義驗收──▶ pi（coding sub-agent）
                                       │  完整實作（src + config + tests + docs）＋ 自我測試
                                       ▼
               codex review ◀──findings──▶ pi coding（迭代至共識，Hermes 裁判）
@@ -33,15 +33,16 @@ Hermes (review/test/驗證 L1-L5) ◀──交付── 完成 → merge
 ```
 
 - **Hermes**：編排（規劃、拆解任務、撰寫 sub-agent prompt、啟動、監控）＋裁判與最終驗證（findings 查證、品質閘門、L1-L5、合併、追蹤）。不寫 src（Model Capacity 接手除外）。
-- **Codex CLI / pi（coding sub-agent）**：**實作工程師**，負責實際程式碼實作（src、config、測試、docs as scoped 完整交付），交付前必先自我測試；無法執行時標記 UNVERIFIED，不得宣稱通過。角色權威定義：母版 `AGENT-CODEX.md` §1 / `AGENT-PI.md`；prompt 要求見 Phase 2。
-- **Review 迴圈角色**（Phase 4）：pi coding ↔ codex review（read-only）迭代至共識；Hermes 是裁判不是修理工。
+- **pi（coding sub-agent）**：**實作工程師**，負責實際程式碼實作（src、config、測試、docs as scoped 完整交付），交付前必先自我測試；無法執行時標記 UNVERIFIED，不得宣稱通過。角色權威定義：母版 `AGENT-PI.md`；prompt 要求見 Phase 2。
+- **codex（code review sub-agent）**：**code reviewer**（read-only），審查 pi 交付、產出 findings（file:line 證據）與 `VERDICT: PASS|FAIL`；usage limit 時切 ollama 通道補審。角色權威定義：母版 `AGENT-CODEX.md`。
+- **Review 迴圈角色**（Phase 4）：pi coding ↔ codex review 迭代至共識（一修一審 1:1）；Hermes 是裁判不是修理工。
 
-本 skill 與母版 `AGENT-HERMES.md` / `AGENT-CODEX.md` / `AGENT-PI.md` 定義**一致**：執行者寫全部 code、交付前自我測試、Hermes 編排＋L1-L5 驗證。專案有母版時以母版為準。`codex` skill 的 multi-stream 分流模式（Hermes 寫 src、Codex 只寫 tests）是補測試／技術債的特例（`references/multi-stream-collaboration.md`），**不是**母版定義、也不是本 skill 模式。
+本 skill 與母版 `AGENT-HERMES.md` / `AGENT-CODEX.md` / `AGENT-PI.md` 定義**一致**（2026-09-05 角色重定義）：Hermes orchestration、pi coding（寫全部 code＋自我測試）、codex code review、Hermes L1-L5 驗證。專案有母版時以母版為準。`codex` skill 的 multi-stream 分流模式（Hermes 寫 src、Codex 只寫 tests）是補測試／技術債的特例（`references/multi-stream-collaboration.md`），**不是**母版定義、也不是本 skill 模式。
 
 ## 前置準備
 
-1. 確認執行者 CLI 可用：Codex `codex --version`；pi `pi --version`；gh 已認證（`gh auth status`）
-2. 載入 `codex` skill（autonomous-ai-agents/codex）取得 Codex 啟動細節；pi 啟動細節見本 skill Phase 3.5
+1. 確認 CLI 可用：pi `pi --version`（coding）、codex `codex --version`（review）；gh 已認證（`gh auth status`）
+2. 載入 `codex` skill（autonomous-ai-agents/codex）取得 codex review 啟動細節；pi 啟動細節見本 skill Phase 3
 3. 確認專案 git 狀態乾淨（`git status`）
 4. 確認 test 執行環境（venv / dotnet / 等）
 
@@ -50,14 +51,13 @@ Hermes (review/test/驗證 L1-L5) ◀──交付── 完成 → merge
 
 ### Phase 0 — 模型選擇 Gate ★強制（skill 觸發時）
 
-**Skill 一經觸發，先詢問使用者本次執行者模型，不得自行預設。**
+**Skill 一經觸發，先詢問使用者本次 coding（pi）與 review（codex）模型，不得自行預設。**
 
-1. 以 `clarify` 詢問本次 Codex/pi 使用的模型，候選至少含：
-   - Codex `gpt-5.6-luna` + `xhigh`（原預設建議）
-   - Codex ollama 本機通道（如 `glm-5.2:cloud`）
-   - pi + ollama（如 `glm-5.2:cloud` / `deepseek-v4-flash:0731-cloud`）
+1. 以 `clarify` 詢問本次兩個 sub-agent 的模型，慣例候選（`~/projects/herdr-orchestrat.md`）：
+   - pi coding：ollama `deepseek-v4-flash:0731-cloud` + `--thinking max`
+   - codex review：`gpt-5.6-luna` + `xhigh`；usage limit 時 fallback ollama 通道（`deepseek-v4-flash:0731-cloud` + `model_reasoning_effort="max"`）
    - 其他（自由指定 provider / model / reasoning）
-2. 使用者未明確選擇前，⛔ 不得撰寫執行者 prompt、不得 spawn 任何 agent。
+2. 使用者未明確選擇前，⛔ 不得撰寫 sub-agent prompt、不得 spawn 任何 agent。
 3. 選擇結果記入 Phase 1.5 計劃呈現內容與 EOR 執行記錄（`docs/exec/<task-id>.md`）。
 
 > 理由：模型與 reasoning 等級直接影響品質與成本，雲端模型 capacity 也變動頻繁；由使用者當場指定，避免 skill 記載的預設值漂移或過時。
@@ -85,13 +85,16 @@ Hermes (review/test/驗證 L1-L5) ◀──交付── 完成 → merge
 
 1. **定義測試案例** — 根據 Phase 1 的驗收標準，寫出具體測試案例（涵蓋正常路徑、邊界、錯誤路徑）。
 2. **確認 RED** — 測試碼必須先跑出 **FAIL（RED）**，證明測試有效、目標行為尚未實作。
-3. **才開始實作** — Codex prompt 中包含已完成的測試碼作為規格，要求 Codex 實作至測試全綠（GREEN）。
+3. **才開始實作** — pi prompt 中包含已完成的測試碼作為規格，要求 pi 實作至測試全綠（GREEN）。
 
-> 測試碼可由 Hermes 撰寫，或由 Codex 在第一趟只寫測試（確認 RED）、第二趟才實作。不論誰寫，**測試碼必須先於實作碼存在且確認 RED**。
+> 測試碼可由 Hermes 撰寫，或由 pi 在第一趟只寫測試（確認 RED）、第二趟才實作。不論誰寫，**測試碼必須先於實作碼存在且確認 RED**。
 
-### Phase 2 — 撰寫 coding sub-agent 委派 Prompt（Codex 預設 / pi 替代）
+### Phase 2 — 撰寫 sub-agent 委派 Prompt（coding=pi；review=codex）
 
-**Prompt 的本質：對一個 coding sub-agent 的完整任務委派書**——sub-agent 收到後獨立實作、自我測試、交付，中途不與使用者對話。模型與 reasoning 依 **Phase 0 使用者選定**，不使用本 skill 範例中的模型值。
+**Prompt 的本質：對一個 sub-agent 的完整任務委派書**——sub-agent 收到後獨立工作、自我驗證、交付，中途不與使用者對話。模型與 reasoning 依 **Phase 0 使用者選定**，不使用本 skill 範例中的模型值。兩種委派書：
+
+- **coding 委派書（pi）** — 下方欄位＋`AGENT-PI.md` §4 模板
+- **review 委派書（codex）** — `AGENT-CODEX.md` §4：review scope、驗收標準、findings 輸出格式（`[Fnn]` severity + file:line 證據）、結尾強制 `VERDICT: PASS|FAIL`
 
 每個 coding sub-agent prompt 必須包含：
 - **角色**：「你是 coding sub-agent（實作工程師），負責完整實作 <任務>；你不規劃專案、不決定驗收標準、不做最終驗證——這些由 Hermes 裁定」
@@ -99,24 +102,21 @@ Hermes (review/test/驗證 L1-L5) ◀──交付── 完成 → merge
 - **read-first**：先讀現有程式碼確認實際屬性/型別/命名，再動手
 - **具體任務**：backlog item / 明確功能，非模糊目標
 - **驗收標準**：具體斷言期望（回傳值、狀態、錯誤處理、閾值）
-- **測試命令**：含絕對路徑的測試指令，讓執行者能自我驗證
+- **測試命令**：含絕對路徑的測試指令，讓 pi 能自我驗證
 - **SELF-TEST 交付前置**：「交付前必須先執行測試指令並確認通過；無法執行時標記 UNVERIFIED，不得宣稱通過」
 - **commit 格式**：確保可追溯（pi 交付為檔案變更 + 回報，commit 可由 Hermes 執行）
 
 > 若專案有 `AGENT-CODEX.md` 或 `AGENT-PI.md`，直接套用其 prompt 模板並填寫具體任務內容。
 
-### Phase 3 — 啟動 Codex
+### Phase 3 — 啟動 pi（coding sub-agent）
+
+coding 由 pi 執行（角色權威定義：母版 `AGENT-PI.md`）。以背景 + pty 啟動：
 
 ```
 terminal(background=true, pty=true, workdir=<專案路徑>, notify_on_complete=true)
 ```
-- 用背景 + pty 啟動 Codex
-- `notify_on_complete=true` 讓 Hermes 在 Codex 完成時收到通知
-- 記錄 session_id
 
-### Phase 3.5 — 啟動 pi（替代執行者）
-
-當使用者指定或 Codex 不可用時，改用 pi（earendil-works pi-coding-agent）：
+批次命令（`-p` 非互動，處理完即退出，已實測可用）：
 
 ```
 pi -p --provider ollama --model <model-id> --thinking xhigh \
@@ -125,18 +125,30 @@ pi -p --provider ollama --model <model-id> --thinking xhigh \
    "<prompt>"
 ```
 
-- **非互動批次**：`-p` 處理 prompt 後即退出（已實測可用）
-- **模型**：`--provider ollama`（本機）或 `openai-codex`（雲端 OAuth）；`--model` 明確指定
-- **規範注入**：`--append-system-prompt AGENT-PI.md` 讓 pi 讀取協作協議
+- **模型**：`--provider ollama`（本機）或 `openai-codex`（雲端 OAuth）；`--model` 明確指定，不可依賴 `settings.json` 預設
+- **規範注入**：`--append-system-prompt AGENT-PI.md` 讓 pi 讀取協作協議（強制）
 - **session 管理**：`--session-dir` 指向 worktree 專屬目錄，避免跨專案 session 污染；或 `--no-session` 一次性執行
-- **交付要求**：與 Codex 相同 — SELF-TEST 前置、UNVERIFIED 標記、L1-L5 驗證流程不變
+- `notify_on_complete=true` 讓 Hermes 在完成時收到通知；記錄 session_id
+
+### Phase 3.5 — 啟動 codex（code review sub-agent）
+
+pi 交付後，code review 由 codex 執行（角色權威定義：母版 `AGENT-CODEX.md`；read-only sandbox）：
+
+```
+codex exec --model <model-id> -c 'model_reasoning_effort="xhigh"' \
+   --sandbox read-only --skip-git-repo-check "<review prompt>"
+```
+
+- **review 委派書**：`AGENT-CODEX.md` §4 模板——review scope、驗收標準、findings 格式（`[Fnn]` severity + file:line 證據）、結尾強制 `VERDICT: PASS|FAIL`
+- **usage limit / capacity fallback**：切 ollama 通道 `codex exec --model deepseek-v4-flash:0731-cloud -c 'model_reasoning_effort="max"' -c 'model_provider="ollama"' --sandbox read-only "<review prompt>"`（reasoning 值陷阱與 provider 設定見 Model Capacity 節）
+- **review 迴圈**：findings → pi 修復 → codex 複審（一修一審 1:1），直到 `VERDICT: PASS`（見 Phase 4 Review 迭代迴圈）
 
 ### Phase 4 — 驗證（Hermes review/test/驗證）★核心
 
-Codex 交付後，**不得直接接受**。先確認 **Codex 已自我測試**：
+pi 交付後，**不得直接接受**。先確認 **pi 已自我測試**：
 
 - 交付是否回報自我測試指令 + 結果？
-- Codex 若標記 UNVERIFIED（無法跑測試）→ Hermes 於 L3 代跑，不把 Codex 的「完成」當證明。
+- pi 若標記 UNVERIFIED（無法跑測試）→ Hermes 於 L3 代跑，不把 pi 的「完成」當證明。
 
 然後執行 **5 層驗證**（L1 品質閘門 → L2 範圍檢查 → L3 測試品質 → L4 語意符合 → L5 回歸）。
 
@@ -153,7 +165,7 @@ E2E 最低標：Chrome `--headless=new --remote-debugging-port=<port>` + CDP 監
 
 **Review 迭代迴圈（2026-09-05 老大指示）★**：
 
-1. 執行者（pi/codex）交付後，**必須先送 codex review**（開獨立 tab，v2 輪起），Hermes 不得在 codex review 之前就自行驗證結案。
+1. pi 交付後，**必須先送 codex review**（開獨立 tab，v2 輪起），Hermes 不得在 codex review 之前就自行驗證結案。
 2. **coding（pi）與 review（codex）需不斷迭代直到達成共識**：codex findings → pi 修復 → codex 複審 → 重複，直到 codex 無新增 findings 且 **VERDICT: PASS**；Hermes 跑 L1-L5 全綠即共識成立。
 3. **不設固定 review 輪數上限**：pi↔codex 持續修復／複審直到達成共識；不得因「已跑兩輪」就在仍有有效 finding 時結案。若雙方對同一 finding 產生無法以測試或原始碼證據消解的實質分歧，才把雙方證據呈交老大裁決。
 4. Hermes 在迴圈中的職責：分派 findings 給 pi 修復（Hermes 只在 pi 失敗/卡死時接手）、代跑被 sandbox 擋住的測試、驗證 findings 是否屬實（防 codex 誤報——誤報時帶證據回 codex 對質而非盲目修）、最終 L1-L5 + E2E。
@@ -162,7 +174,7 @@ E2E 最低標：Chrome `--headless=new --remote-debugging-port=<port>` + CDP 監
 
 **編排層額外要求**：
 - **TDD gate 回顧** — L3 時確認 Phase 1.5 的測試碼已被實作覆蓋為 GREEN，不是事後補寫的測試
-- **退回迴圈**：L1-L4 任一 FAIL → 帶具體 gap list 退回 Codex 修 → 從 L1 重跑。L5 FAIL → Hermes 決定 revert 或修。
+- **退回迴圈**：L1-L4 任一 FAIL → 帶具體 gap list 退回 pi 修（codex findings 同輪處理）→ 從 L1 重跑。L5 FAIL → Hermes 決定 revert 或修。
 
 ### Phase 5 — 合併 + 追蹤
 
@@ -172,13 +184,13 @@ E2E 最低標：Chrome `--headless=new --remote-debugging-port=<port>` + CDP 監
 
 ## 並行 Sub-agent 模式（大 Step 拆解）
 
-當一個 Step 太大（如前後端 + API 同時開發），拆成 2–4 個**各自完整實作**的 Codex sub-agent，每個跑在獨立 worktree：
+當一個 Step 太大（如前後端 + API 同時開發），拆成 2–4 個**各自完整實作**的 pi coding sub-agent，每個跑在獨立 worktree：
 
 ```
 main (clean baseline)
-  ├── worktree A  ──  Codex 實作模組 A（src + tests）
-  ├── worktree B  ──  Codex 實作模組 B（src + tests）
-  └── worktree C  ──  Codex 實作模組 C（src + tests）
+  ├── worktree A  ──  pi 實作模組 A（src + tests）
+  ├── worktree B  ──  pi 實作模組 B（src + tests）
+  └── worktree C  ──  pi 實作模組 C（src + tests）
 ```
 
 ### 啟動流程
@@ -186,9 +198,9 @@ main (clean baseline)
 1. **拆解** — 依關注面切分（如後端 API / 前端看板 / 前端報表），每個 sub-agent 有獨立 src 範圍 + 驗收。
 2. **建立 worktree** — `git worktree add -b feat/stepN-a /tmp/stepN-a main`，每個分支獨立。
 3. **同步 src** — worktree 從 main 建立；若 main 有後續 commit，啟動前先 `git checkout main -- src/`。
-4. **並行啟動 Codex** — 每個 worktree 一個 `terminal(background=true, pty=true, workdir=/tmp/stepN-x)`。
+4. **並行啟動 pi** — 每個 worktree 一個 `terminal(background=true, pty=true, workdir=/tmp/stepN-x)`；各分支交付後分別送 codex review。
 5. **不閒置** — Hermes 利用等待時間更新文件、確認下游依賴、清理分支、預備下一步。
-6. **逐個驗證** — 每個 Codex 退出後跑 L1–L4，通過後依序合併。
+6. **逐個驗證** — 每個 pi 退出後送 codex review（迭代至 VERDICT: PASS），通過後跑 L1–L4，再依序合併。
 7. **合併順序** — 先合併無共享檔案的分支；有共享檔案的分支最後合併，合併後立即檢查覆蓋。
 
 ### 啟動方式二選一：terminal 模式 / Herdr 模式
@@ -216,14 +228,18 @@ herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd /tmp/stepN-a --label "s
 - 同 tab `pane split` 分屏改為**備選**：僅當老大要求「一眼同看多 agent 對照進度」或任務極短（分屏比切 tab 快）時使用；寬切 right、窄/高切 down，`--no-focus` 保留焦點。
 - 新 tab 內若要跑多個 agent，再對 root pane `pane split`。
 
-啟動執行者（兩種方式）：
+啟動 sub-agent（兩種方式）：
 
 1. **批次模式**（與 terminal 模式等價，輸出可監控）：
 
 ```bash
-herdr pane run <pane-id> "codex exec --model <Phase 0 選定模型> -c 'model_reasoning_effort=\"xhigh\"' --sandbox danger-full-access --skip-git-repo-check \"<prompt>\""
+# coding sub-agent（pi）：
+herdr pane run <pane-id> "pi -p --provider ollama --model <Phase 0 選定模型> --thinking max --session-dir <worktree>/.pi-sessions --append-system-prompt <專案>/AGENT-PI.md \"<prompt>\""
 herdr pane wait-output <pane-id> --match "tokens used" --timeout 600000
 herdr pane read <pane-id> --source recent-unwrapped --lines 200
+
+# review sub-agent（codex）：
+herdr pane run <pane-id> "codex exec --model <Phase 0 選定模型> -c 'model_reasoning_effort=\"xhigh\"' --sandbox read-only --skip-git-repo-check \"<review prompt>\""
 ```
 
 2. **原生 agent 模式**（Herdr 認得 Codex 生命週期 idle/working/blocked/done）：
@@ -237,7 +253,7 @@ herdr agent read stepN-a --source recent-unwrapped --lines 200
 
 - `agent start` 前 pane 必須是空 shell interactive prompt；先用 `herdr agent` 確認本機支援的 kind 清單。
 - `blocked` = agent 卡在 approval/問題 UI → `agent read` 檢查後問使用者，勿代答。
-- pi 執行者同理：批次用 `pane run "pi -p ..."`；pi 非 Herdr 原生 kind 時走批次模式。
+- coding sub-agent = pi（`pane run "pi -p ..."` 批次或原生 kind）；review sub-agent = codex（`pane run "codex exec ... --sandbox read-only"` 批次）。
 
 Herdr 模式安全規則：一律 `--current` 或明確 pane ID / agent 名稱；不關閉非自己建立的 workspace/tab/pane；不跑 `herdr server stop`；不殺 Herdr 主程序。
 
@@ -268,12 +284,12 @@ Herdr 模式安全規則：一律 `--current` 或明確 pane ID / agent 名稱�
 
 ## 多 Agent 任務分配原則 ★
 
-> 使用者確認的協同架構：**Hermes 架構分派 → 多平行 Codex sub-agent（各自獨立 worktree）→ Codex 負責 coding + 交付前自我測試驗證 → 交付回 Hermes 做最終測試驗證。任務交付前 / coding 前，必須先將測試驗證程式做好。**
+> 使用者確認的協同架構（2026-09-05 角色重定義）：**Hermes 架構分派 → 多平行 pi coding sub-agent（各自獨立 worktree）→ pi 負責 coding + 交付前自我測試驗證 → codex code review 迭代至共識 → 交付回 Hermes 做最終測試驗證。任務交付前 / coding 前，必須先將測試驗證程式做好。**
 
 ### 兩條硬規則（強制，不可跳過）
 
-1. **測試先行（TDD gate）** — 任何 coding 前，先完成測試驗證程式並確認 **RED**，才允許實作至 **GREEN**。Codex 不得先寫實作再補測試。
-2. **交付前自我測試** — Codex 交付前必須自己跑測試並確認通過；無法執行時標記 **UNVERIFIED**，不得宣稱完成。Hermes 收到後仍做最終 L1–L5 驗證，不把 Codex 的「完成」當證明。
+1. **測試先行（TDD gate）** — 任何 coding 前，先完成測試驗證程式並確認 **RED**，才允許實作至 **GREEN**。pi 不得先寫實作再補測試。
+2. **交付前自我測試** — pi 交付前必須自己跑測試並確認通過；無法執行時標記 **UNVERIFIED**，不得宣稱完成。Hermes 收到後先送 codex review、再做最終 L1–L5 驗證，不把 pi 的「完成」當證明。
 
 ### 分配原則
 
@@ -286,14 +302,14 @@ Herdr 模式安全規則：一律 `--current` 或明確 pane ID / agent 名稱�
 
 **模式 A：後端 + 前端 + 整合（最常用）**
 
-| Stream | Codex 職責 | 可改範圍 | 禁止碰觸 |
+| Stream | pi 職責 | 可改範圍 | 禁止碰觸 |
 |---|---|---|---|
 | A — Domain/Application | Entity、DTO、Service、商業規則、xUnit | `src/EEMS.Domain/`、`src/EEMS.Application/`、對應測試 | API、前端、`Program.cs` |
 | B — API/Infrastructure | Controller、Repository、DbContext、SignalR Hub、整合測試 | `src/EEMS.Api/Controllers/`、指定 Infrastructure 檔、測試 | 前端、未授權共享註冊檔 |
 | C — Frontend | Page、Component、API client、圖表/表格 UI | 前端專案目錄 | .NET API、DB migration |
 | D — Integrator | DI、路由、`Program.cs`、solution/migration 必要整合 | 明確指定的共享檔案 | 不重寫 A/B/C 已完成的模組 |
 
-> **D 必須最後執行或最後合併**，避免 `Program.cs`、路由註冊被覆蓋。
+> **D 必須最後執行或最後合併**，避免 `Program.cs`、路由註冊被覆蓋。各 stream 交付後分別送 codex review，review 迭代至共識後才合併。
 
 **模式 B：純後端大型功能**（依賴順序 A → B → C → D；A 已合併時 B/C 可平行）
 
@@ -330,44 +346,46 @@ dotnet test  /path/to/EEMS/EEMS.sln
 
 ## Agent 生命週期監控（執行中管理）★
 
-Codex spawn 執行期間，Hermes 不得只等 notify_on_complete——要主動監控：
+coding sub-agent（pi）spawn 執行期間，Hermes 不得只等 notify_on_complete——要主動監控：
 
-1. **卡死偵測** — Codex 執行中，定期 poll 其輸出（建議每 10–15 分鐘）。若超過閾值（如 20 分鐘）無任何新輸出，判定卡死（網路掛起、等待輸入、程序僵死），直接 kill，再走 Model Capacity 的接手流程（先檢查已產出 → commit → 接手或重試）。
-2. **完成自動化** — Codex 退出後立即自動收集：`git status --short`、測試執行摘要、最後產出的檔案清單，作為 L1–L5 驗證的前置資料，不重複收集。
-3. **全員完成整合檢查** — 並行 sub-agent 全部退出後，先確認每個 worktree 的完成狀態（有無未 commit 產出、是否標記 UNVERIFIED），確認沒有任何 agent 仍在執行，才開始依序合併。
-4. **執行記錄落盤（EOR/ESR）** — 每個 Codex 任務結束後寫入執行記錄檔（如 `docs/exec/<task-id>.md`），固定欄位：任務 ID、修改檔案清單、自我測試指令與結果、UNVERIFIED 項目、capacity/卡死事件、接手人與處理方式。跨 session 可追溯事實；PITFALLS.md 只記教訓，EOR 記事實。
+1. **卡死偵測** — pi 執行中，定期 poll 其輸出（建議每 10–15 分鐘）。若超過閾值（如 20 分鐘）無任何新輸出，判定卡死（網路掛起、等待輸入、程序僵死），直接 kill，再走 Model Capacity 的接手流程（先檢查已產出 → commit → 接手或重試）。
+2. **完成自動化** — pi 退出後立即自動收集：`git status --short`、測試執行摘要、最後產出的檔案清單，作為 codex review 與 L1–L5 驗證的前置資料，不重複收集。
+3. **全員完成整合檢查** — 並行 sub-agent 全部退出後，先確認每個 worktree 的完成狀態（有無未 commit 產出、是否標記 UNVERIFIED），確認沒有任何 agent 仍在執行，才開始依序送 review + 合併。
+4. **執行記錄落盤（EOR/ESR）** — 每個 coding 任務結束後寫入執行記錄檔（如 `docs/exec/<task-id>.md`），固定欄位：任務 ID、修改檔案清單、自我測試指令與結果、UNVERIFIED 項目、capacity/卡死事件、review 輪次與最終 VERDICT、接手人與處理方式。跨 session 可追溯事實；PITFALLS.md 只記教訓，EOR 記事實。
 
 **Herdr 模式下的監控**：poll 來源改用 `pane read`（批次模式）或 `agent get` 的生命週期狀態（原生 agent 模式）——`idle`/`done` 是完成信號，`blocked` 是卡在審批的信號，`unknown` 不代表完成；卡死閾值同上，卡住時可用 `herdr agent send-keys <name> ctrl+c` 中斷後走 capacity 接手流程。
 
 ## Model Capacity 處理
 
-`gpt-5.6-luna` 等模型可能因 **capacity 不足** exit 1，但已產出部分檔案。這與 token 耗盡不同：
+角色分工下，通道故障處理依 sub-agent 分流：**coding（pi）**與 **review（codex）**各有 fallback，互不混用。
+
+**review（codex）通道故障** — `gpt-5.6-luna` 可能因 **usage limit / capacity 不足** exit 1。這與 token 耗盡不同：
 
 | | Token 耗盡 | Capacity 不足 |
 |---|---|---|
 | Exit code | 0（正常退出） | **1**（錯誤退出） |
-| 日誌特徵 | "tokens used ~113k" | "capacity" / "rate limit" / "暫時不可用" |
-| 檔案狀態 | 已寫但未 commit | **可能已寫也可能未寫** |
-| 處理方式 | Hermes 代跑測試 + commit | 先檢查已產出 → 決定接手或重試 |
+| 日誌特徵 | "tokens used ~113k" | "capacity" / "rate limit" / "usage limit" |
+| 產出狀態 | review 文字已完整 | **可能已產出也可能沒有** |
+| 處理方式 | 正常進入迴圈 | 先收集輸出 → 決定補審或呈報 |
 
 ### 接手流程
 
-1. **檢查已產出** — `git status --short` 在 worktree 確認有無新檔案
-2. **若有產出** — Hermes 手動 commit 已產出檔案（`git add -A && git commit -m "feat: partial <task> (Codex capacity exit)"`），然後接手完成剩餘實作 + 測試
-3. **若無產出** — 重試 Codex（capacity 不足通常是暫時的）：`codex exec --model gpt-5.6-luna -c 'model_reasoning_effort="xhigh"' --sandbox danger-full-access --skip-git-repo-check "<prompt>"`
-4. **重試上限** — 同一目的最多重試 **一次**；二次仍 capacity exit → Hermes 完全接手實作，不反覆重試
-5. **Fallback 模型鏈** — 依序嘗試：`gpt-5.6-luna` → 次選模型（如 `glm-5.2:cloud`，視可用性）→ Hermes 完全接手。每階嘗試前先檢查已產出並 commit，避免重複工作
-6. **記錄** — 在 session 記錄中標注 capacity exit 事件，供下次評估是否換模型
+1. **先收集輸出** — exit 1 斷在回報階段時 review 文字常已產出（session rollout jsonl 可取全文），盤點後再決定
+2. **review（codex）fallback** — 切 ollama 通道補審（命令見下節 Ollama 模式）；同一目的最多重試 **一次**；兩通道皆不可用 → **停止並呈報老大裁決**，不得以 Hermes 自行驗證抵免 codex review
+3. **coding（pi）provider down** — `pi auth check` 失敗時：先 `git status --short` 盤點已產出並 commit（`git add -A && git commit -m "feat: partial <task> (pi provider down)"`），再切通道（ollama ↔ openai-codex，認證過期重新授權不硬撞）；兩通道皆不可用 → Hermes 接手 coding（同 TDD/self-test 規則）
+4. **重試上限** — 同一目的最多重試 **一次**；二次仍失敗 → 依角色分流接手（coding=Hermes 接手、review=呈報老大），不反覆重試
+5. **記錄** — EOR 記錄中標注 capacity/provider 事件與接手方式，供下次評估是否換模型
 
-### Codex CLI 命令格式（指定 model + reasoning）
+### codex CLI 命令格式（review sub-agent，指定 model + reasoning）
 
 ```
-codex exec --model gpt-5.6-luna -c 'model_reasoning_effort="xhigh"' --sandbox danger-full-access --skip-git-repo-check "<prompt>"
+codex exec --model gpt-5.6-luna -c 'model_reasoning_effort="xhigh"' --sandbox read-only --skip-git-repo-check "<review prompt>"
 ```
 
-- `gpt-5.6-luna` + `xhigh` reasoning 是指定配置，不依賴本機預設值
+- `gpt-5.6-luna` + `xhigh` reasoning 是 review 慣例配置，不依賴本機預設值
+- `--sandbox read-only`：review 唯讀，不修改檔案（`AGENT-CODEX.md` §2.5）
 - `--skip-git-repo-check` 在 worktree 可能需要（視 Codex 版本）
-- capacity exit 時重試同一命令即可
+- capacity exit 時先收集輸出再重試同一命令
 
 **Ollama 模式（本機通道，已實測可用）**：
 
@@ -380,16 +398,16 @@ codex exec --oss --local-provider ollama --model glm-5.2:cloud --skip-git-repo-c
 
 - **reasoning 值陷阱**：ollama API 只收 `max/high/medium/low/none`，`xhigh` 會在長任務尾端炸 `invalid reasoning value` + Reconnecting 5 次 exit 1——ollama 通道一律用 `model_reasoning_effort="max"`，且以 `-c` 覆寫不依賴 ~/.codex/config.toml 預設
 - **`model_provider="ollama"` 需在 ~/.codex/config.toml 有對應 `[model_providers.ollama]` 區段**（base_url 指向 ollama /v1）；若無，用舊法 `--oss --local-provider ollama`
-- exit 1 斷在回報階段時程式碼常已寫畢——先 `git status` 盤點再決定接手
+- exit 1 斷在回報階段時 review 文字常已產出——先收集（rollout jsonl）再決定補審
 
 - codex 0.148.0 不支援 `--provider` 參數，必須用 `--oss --local-provider ollama`
 - 設定檔 `~/.codex/ollama-launch.config.toml`：定義 provider `ollama-launch`（`wire_api = "responses"`，ollama 已支援 responses API，實測回 `status: completed`）；檔內 `model` 預設值會隨使用調整（2026-09 現況為 `deepseek-v4-flash:0731-cloud`），故命令一律明確指定 `--model`，不可依賴設定檔預設
 - 已知非致命警告（不影響執行，但每次啟動會刷出）：
   - `failed to refresh available models: missing field 'models'` — codex 期待 `/v1/models` 回 `{"models":[...]}`，ollama 回 OpenAI 格式 `{"object":"list","data":[...]}`
   - `Model metadata for glm-5.2:cloud not found. Defaulting to fallback metadata` — 效能可能略降
-- 適用場景：雲端 `gpt-5.6-luna` capacity 不足時的 fallback 鏈次選（與 pi ollama 通道共用同一本機 ollama）
-- **完整工具鏈已實測（2026-08-22）**：寫檔 + 執行測試 + 回報正常，Hermes 獨立核對檔案內容與測試結果一致
-- ⚠️ **approval 坑**：`approval_policy = "on-request"` 下，codex 執行 shell 命令（寫檔、跑測試）會觸發 approval 請求；非互動批次（`codex exec`）中該請求會卡住直到 timeout。實測解法：Hermes 以 `terminal` 啟動時由使用者批准，或改用 `--sandbox danger-full-access`（skill 雲端模式已在用）避免逐次批准
+- 適用場景：雲端 `gpt-5.6-luna` review capacity 不足時的補審通道（與 pi ollama 通道共用同一本機 ollama）
+- **完整工具鏈已實測（2026-08-22，當時 codex 尚任 coder）**：寫檔 + 執行測試 + 回報正常，Hermes 獨立核對一致；角色重定義後此能力僅在老大明確指示時例外使用
+- ⚠️ **approval 坑**：`approval_policy = "on-request"` 下，codex 執行寫檔/跑測試等 shell 命令會觸發 approval 請求；非互動批次（`codex exec`）中該請求會卡住直到 timeout。review 用 `--sandbox read-only` 不寫檔即無此問題；若例外讓 codex 寫碼，需 `--sandbox danger-full-access` 並由使用者批准
 
 ### pi CLI 命令格式（指定 provider + model + thinking）
 
@@ -402,7 +420,7 @@ pi -p --provider ollama --model deepseek-v4-flash:0731-cloud --thinking xhigh \
 - 本機通道：`--provider ollama`（`http://127.0.0.1:11434/v1`，與 Hermes 共用）
 - 雲端通道：`--provider openai-codex`（OAuth，`pi auth check --provider openai-codex` 驗證）
 - 認證過期（OAuth 約 10 天）→ 重新授權，不重試硬撞
-- 優先使用 `--thinking xhigh`（對應 Codex 的 extra high 等級）
+- thinking 等級：ollama 通道慣例 `--thinking max`（stock 實證）；雲端通道可用 `xhigh`（對應 codex extra high）。以 Phase 0 使用者選定為準
 - `--append-system-prompt AGENT-PI.md` 為強制：把 pi 協作協議注入 system prompt
 
 **pi + glm-5.2:cloud 已實測可用（2026-08-22）**：完整工具鏈（寫檔 → 執行測試 → 回報）正常，`pi auth check --provider ollama` → ready。`~/.pi/agent/models.json` 已註冊 `glm-5.2:cloud`（contextWindow 1000000、reasoning: true）。注意 `settings.json` 的 `defaultModel` 是 `deepseek-v4-flash:0731-cloud`，協同流程必須明確指定 `--model glm-5.2:cloud`，不可依賴預設。
@@ -418,10 +436,11 @@ pi -p --provider ollama --model deepseek-v4-flash:0731-cloud --thinking xhigh \
 - **失敗斷路器** — 同一目的最多重試一次替代方法；二次仍失敗 → Hermes 完全接手，不反覆重試。
 - **HERDR_ENV 未設卻跑 herdr 控制命令** — Hermes 不在 Herdr pane 內時，herdr CLI 無法控制 session（甚至污染使用者自己的 session）；Herdr 模式前必先 `test "${HERDR_ENV:-}" = 1`，不通過退回 terminal 模式。
 - **pane 與 agent 混用** — pane 是原始終端、agent 是 Herdr 認得生命週期的 coding agent；需要 blocked/idle/done 偵測就用 `agent start` + `agent prompt`，否則用 `pane run` 批次；`agent start` 不會自己建 pane。
-- **卡死未偵測** — Codex 掛住不退出（無新輸出）時若只等 notify_on_complete，會空等數小時；必須定期 poll 輸出並設定卡死閾值。
+- **卡死未偵測** — 執行者（pi）掛住不退出（無新輸出）時若只等 notify_on_complete，會空等數小時；必須定期 poll 輸出並設定卡死閾值。
 - **計劃與執行同回合** — 呈現計劃的同時 spawn/write prompt，使用者來不及批准；計劃呈現與執行必須不同回合。
-- **未問模型即啟動** — 跳過 Phase 0 模型選擇 Gate，依 skill 記載的預設模型直接 spawn；每次 skill 觸發都必須先以 clarify 詢問使用者本次執行者模型與 reasoning。
-- **缺執行記錄** — 任務結束未落盤 EOR，事後無法追溯「誰做了什麼、測了什麼」；每個 Codex 任務結束必寫 `docs/exec/<task-id>.md`。
+- **未問模型即啟動** — 跳過 Phase 0 模型選擇 Gate，依 skill 記載的預設模型直接 spawn；每次 skill 觸發都必須先以 clarify 詢問使用者本次 coding（pi）與 review（codex）模型與 reasoning。
+- **缺執行記錄** — 任務結束未落盤 EOR，事後無法追溯「誰做了什麼、測了什麼」；每個 coding 任務結束必寫 `docs/exec/<task-id>.md`。
+- **codex 拿去當 coding 用** — 角色重定義（2026-09-05）後 codex 只做 code review（read-only）；coding 一律派 pi。雲端通道 capacity 不足時補審走 ollama 通道，不把 codex 拉回來寫碼。
 - **跳過 codex review 直接結案** — 執行者交付後 Hermes 自行驗證就結案，繞過 codex review（2026-09-05 老大指正）；正確流程＝交付→codex review→修復迭代→共識（codex PASS + Hermes L1-L5 綠）才結案，見 Phase 4 Review 迭代迴圈。
 - **修復輪與 review 輪合併** — 兩輪修復才送一次 review（2026-09-05 老大指正「為什麼沒 codex 驗證」）；每輪修復後**立即**送 codex 複審，一修一審 1:1，不合併輪次。
 - **執行者空轉/pane 不執行** — herdr pane run 後程序未起（pgrep 無進程）或 pi 翻找自己 session 檔零修改；偵測＝5 秒內 pgrep 驗證程序已起＋預期產出檔案 mtime/測試數變化；作廢改開新 tab 重派，同目的不重試第二次（斷路器）。
