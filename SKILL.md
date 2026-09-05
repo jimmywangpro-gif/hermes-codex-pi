@@ -45,6 +45,20 @@ Hermes (review/test/驗證) ◀──交付── 完成
 
 ## 工作流
 
+### Phase 0 — 模型選擇 Gate ★強制（skill 觸發時）
+
+**Skill 一經觸發，先詢問使用者本次執行者模型，不得自行預設。**
+
+1. 以 `clarify` 詢問本次 Codex/pi 使用的模型，候選至少含：
+   - Codex `gpt-5.6-luna` + `xhigh`（原預設建議）
+   - Codex ollama 本機通道（如 `glm-5.2:cloud`）
+   - pi + ollama（如 `glm-5.2:cloud` / `deepseek-v4-flash:0731-cloud`）
+   - 其他（自由指定 provider / model / reasoning）
+2. 使用者未明確選擇前，⛔ 不得撰寫執行者 prompt、不得 spawn 任何 agent。
+3. 選擇結果記入 Phase 1.5 計劃呈現內容與 EOR 執行記錄（`docs/exec/<task-id>.md`）。
+
+> 理由：模型與 reasoning 等級直接影響品質與成本，雲端模型 capacity 也變動頻繁；由使用者當場指定，避免 skill 記載的預設值漂移或過時。
+
 ### Phase 1 — Hermes 規劃（編排）
 
 1. **理解需求** — 確認目標、範圍、驗收標準。有歧義先問，不要猜。
@@ -73,6 +87,8 @@ Hermes (review/test/驗證) ◀──交付── 完成
 > 測試碼可由 Hermes 撰寫，或由 Codex 在第一趟只寫測試（確認 RED）、第二趟才實作。不論誰寫，**測試碼必須先於實作碼存在且確認 RED**。
 
 ### Phase 2 — 撰寫執行者 Prompt（Codex 預設 / pi 替代）
+
+模型與 reasoning 依 **Phase 0 使用者選定**，不使用本 skill 範例中的模型值。
 
 每個 Codex prompt 必須包含：
 - **角色**：「你是實作工程師，負責完整實作 <任務>」
@@ -320,6 +336,7 @@ pi -p --provider ollama --model deepseek-v4-flash:0731-cloud --thinking xhigh \
 - **失敗斷路器** — 同一目的最多重試一次替代方法；二次仍失敗 → Hermes 完全接手，不反覆重試。
 - **卡死未偵測** — Codex 掛住不退出（無新輸出）時若只等 notify_on_complete，會空等數小時；必須定期 poll 輸出並設定卡死閾值。
 - **計劃與執行同回合** — 呈現計劃的同時 spawn/write prompt，使用者來不及批准；計劃呈現與執行必須不同回合。
+- **未問模型即啟動** — 跳過 Phase 0 模型選擇 Gate，依 skill 記載的預設模型直接 spawn；每次 skill 觸發都必須先以 clarify 詢問使用者本次執行者模型與 reasoning。
 - **缺執行記錄** — 任務結束未落盤 EOR，事後無法追溯「誰做了什麼、測了什麼」；每個 Codex 任務結束必寫 `docs/exec/<task-id>.md`。
 
 ## 驗證命令範例
