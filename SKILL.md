@@ -139,6 +139,14 @@ Codex 交付後，**不得直接接受**。先確認 **Codex 已自我測試**�
 
 > **權威來源**：`codex` skill 的 `references/codex-deliverable-verification.md` — 含每層具體命令、退回迴圈規則、失敗模式對策表。本 skill 不重複；以下僅列出編排層獨有的注意事項。
 
+**Review 迭代迴圈（2026-09-05 老大指示）★**：
+
+1. 執行者（pi/codex）交付後，**必須先送 codex review**（開獨立 tab，v2 輪起），Hermes 不得在 codex review 之前就自行驗證結案。
+2. Codex review 產出 findings 後進入**迭代迴圈**：修復（pi/Hermes 依 findings 分工）→ 再送 codex 複審 → 重複直到 **codex VERDICT: PASS 且 Hermes L1-L5 全綠**（兩者共識）。
+3. 迭代上限：同一交付最多 **2 輪** codex review；第 3 輪仍有分歧時，老大裁決，不得無限迭代。
+4. Hermes 在迴圈中的職責：代跑被 sandbox 擋住的測試、驗證 findings 是否屬實（防 codex 誤報）、執行修復或分派修復、最終 L1-L5 + E2E。
+5. 踩坑記錄：v1 輪曾跳過 codex review 直接 Hermes 驗證結案（被老大指正）；v2 輪起此為硬閘門。
+
 **編排層額外要求**：
 - **TDD gate 回顧** — L3 時確認 Phase 1.5 的測試碼已被實作覆蓋為 GREEN，不是事後補寫的測試
 - **退回迴圈**：L1-L4 任一 FAIL → 帶具體 gap list 退回 Codex 修 → 從 L1 重跑。L5 FAIL → Hermes 決定 revert 或修。
@@ -392,6 +400,7 @@ pi -p --provider ollama --model deepseek-v4-flash:0731-cloud --thinking xhigh \
 - **計劃與執行同回合** — 呈現計劃的同時 spawn/write prompt，使用者來不及批准；計劃呈現與執行必須不同回合。
 - **未問模型即啟動** — 跳過 Phase 0 模型選擇 Gate，依 skill 記載的預設模型直接 spawn；每次 skill 觸發都必須先以 clarify 詢問使用者本次執行者模型與 reasoning。
 - **缺執行記錄** — 任務結束未落盤 EOR，事後無法追溯「誰做了什麼、測了什麼」；每個 Codex 任務結束必寫 `docs/exec/<task-id>.md`。
+- **跳過 codex review 直接結案** — 執行者交付後 Hermes 自行驗證就結案，繞過 codex review（2026-09-05 老大指正）；正確流程＝交付→codex review→修復迭代→共識（codex PASS + Hermes L1-L5 綠）才結案，見 Phase 4 Review 迭代迴圈。
 
 ## 驗證命令範例
 
