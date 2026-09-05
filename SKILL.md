@@ -143,7 +143,7 @@ Codex 交付後，**不得直接接受**。先確認 **Codex 已自我測試**�
 
 1. 執行者（pi/codex）交付後，**必須先送 codex review**（開獨立 tab，v2 輪起），Hermes 不得在 codex review 之前就自行驗證結案。
 2. **coding（pi）與 review（codex）需不斷迭代直到達成共識**：codex findings → pi 修復 → codex 複審 → 重複，直到 codex 無新增 findings 且 **VERDICT: PASS**；Hermes 跑 L1-L5 全綠即共識成立。
-3. 迭代上限：同一交付最多 **2 輪** codex review；第 3 輪仍有分歧時，老大裁決，不得無限迭代。
+3. **不設固定 review 輪數上限**：pi↔codex 持續修復／複審直到達成共識；不得因「已跑兩輪」就在仍有有效 finding 時結案。若雙方對同一 finding 產生無法以測試或原始碼證據消解的實質分歧，才把雙方證據呈交老大裁決。
 4. Hermes 在迴圈中的職責：分派 findings 給 pi 修復（Hermes 只在 pi 失敗/卡死時接手）、代跑被 sandbox 擋住的測試、驗證 findings 是否屬實（防 codex 誤報——誤報時帶證據回 codex 對質而非盲目修）、最終 L1-L5 + E2E。
 5. 踩坑記錄：v1 輪曾跳過 codex review 直接 Hermes 驗證結案（被老大指正）；v2 輪起此為硬閘門，且迭代主體是 pi↔codex，Hermes 是裁判不是修理工。
 
