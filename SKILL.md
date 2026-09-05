@@ -172,9 +172,9 @@ main (clean baseline)
 
 ### 啟動方式二選一：terminal 模式 / Herdr 模式
 
-**A. terminal 模式（預設）** — 上列第 4 步用 `terminal(background=true, pty=true, workdir=<worktree>)`，定期 poll 輸出監控。
+**A. terminal 模式（無 Herdr 環境時）** — 上列第 4 步用 `terminal(background=true, pty=true, workdir=<worktree>)`，定期 poll 輸出監控。
 
-**B. Herdr 模式（使用者要求以 Herdr 框架啟動時）** — 套用 `herdr` skill（先 `skill_view('herdr')` 載入完整命令參考）。
+**B. Herdr 模式（預設拓撲：每個 sub-agent 開新 tab；使用者要求以 Herdr 框架啟動時）** — 套用 `herdr` skill（先 `skill_view('herdr')` 載入完整命令參考）。
 
 前置硬閘門：
 
@@ -185,14 +185,15 @@ test "${HERDR_ENV:-}" = 1
 - 通過 → Hermes 跑在 Herdr 管理的 pane 內，可用 herdr CLI 控制本 session，進入 Herdr 模式。
 - 不通過 → ⛔ 不得用 herdr 控制命令；退回 terminal 模式，並告知使用者：要以 Herdr 啟動需把 Hermes 跑在 Herdr pane 內（如 `herdrclaude`）。
 
-建立平行 pane（每個 sub-agent 一個 pane，同 tab 逐個 split）：
+建立執行環境（**預設：每個 sub-agent 一個新 tab**；老大已明確指定此拓撲，覆寫 herdr skill 的 sibling-pane 預設）：
 
 ```bash
-herdr pane split --current --direction right --cwd /tmp/stepN-a --no-focus
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd /tmp/stepN-a --label "stepN-a"
 ```
 
-- 寬 pane 切 right、窄/高切 down，避免同向連切出窄欄；`--no-focus` 保留使用者焦點；`--cwd` 指向各 worktree。
-- 新 pane ID 從 `.result.pane.pane_id` 讀取，一律解析 JSON 回應，不從側欄順序推測。
+- 從 `.result.tab` 取 tab_id、`.result.root_pane` 取 root pane ID；每個 tab 全寬，輸出可讀性最佳，且不搶使用者焦點（預設 no-focus，要切過去看才 `--focus` 或 `herdr tab focus`）。
+- 同 tab `pane split` 分屏改為**備選**：僅當老大要求「一眼同看多 agent 對照進度」或任務極短（分屏比切 tab 快）時使用；寬切 right、窄/高切 down，`--no-focus` 保留焦點。
+- 新 tab 內若要跑多個 agent，再對 root pane `pane split`。
 
 啟動執行者（兩種方式）：
 
