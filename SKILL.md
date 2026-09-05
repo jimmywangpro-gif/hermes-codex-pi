@@ -24,16 +24,19 @@ metadata:
 任何 coding 專案（新專案、功能、修 bug）的通用協同模式：
 
 ```
-Hermes (編排) ──規劃/拆解/定義驗收──▶ Codex (寫碼)
-                                      │  完整實作
+Hermes (編排) ──規劃/拆解/定義驗收──▶ coding sub-agent（Codex 預設 / pi 替代）
+                                      │  完整實作（src + config + tests + docs）＋ 自我測試
                                       ▼
-Hermes (review/test/驗證) ◀──交付── 完成
+              codex review ◀──findings──▶ pi coding（迭代至共識，Hermes 裁判）
+                                      ▼
+Hermes (review/test/驗證 L1-L5) ◀──交付── 完成 → merge
 ```
 
-- **Hermes**：規劃、拆解任務、撰寫 Codex prompt、啟動 Codex、審查產出、執行測試、品質閘門、驗證、合併、追蹤。
-- **Codex CLI**：負責**實際程式碼實作**（src、config、測試等完整交付）。
+- **Hermes**：編排（規劃、拆解任務、撰寫 sub-agent prompt、啟動、監控）＋裁判與最終驗證（findings 查證、品質閘門、L1-L5、合併、追蹤）。不寫 src（Model Capacity 接手除外）。
+- **Codex CLI / pi（coding sub-agent）**：**實作工程師**，負責實際程式碼實作（src、config、測試、docs as scoped 完整交付），交付前必先自我測試；無法執行時標記 UNVERIFIED，不得宣稱通過。角色權威定義：母版 `AGENT-CODEX.md` §1 / `AGENT-PI.md`；prompt 要求見 Phase 2。
+- **Review 迴圈角色**（Phase 4）：pi coding ↔ codex review（read-only）迭代至共識；Hermes 是裁判不是修理工。
 
-這與既有母版 `AGENT-HERMES.md` / `AGENT-CODEX.md` 的分流模式（Codex 只寫 tests）不同。本 skill 是**通用模式**：Codex 負責整個 coding，Hermes 負責編排與驗證。若專案已有該母版並指定分流模式，優先遵循母版。
+本 skill 與母版 `AGENT-HERMES.md` / `AGENT-CODEX.md` / `AGENT-PI.md` 定義**一致**：執行者寫全部 code、交付前自我測試、Hermes 編排＋L1-L5 驗證。專案有母版時以母版為準。`codex` skill 的 multi-stream 分流模式（Hermes 寫 src、Codex 只寫 tests）是補測試／技術債的特例（`references/multi-stream-collaboration.md`），**不是**母版定義、也不是本 skill 模式。
 
 ## 前置準備
 
@@ -86,12 +89,12 @@ Hermes (review/test/驗證) ◀──交付── 完成
 
 > 測試碼可由 Hermes 撰寫，或由 Codex 在第一趟只寫測試（確認 RED）、第二趟才實作。不論誰寫，**測試碼必須先於實作碼存在且確認 RED**。
 
-### Phase 2 — 撰寫執行者 Prompt（Codex 預設 / pi 替代）
+### Phase 2 — 撰寫 coding sub-agent 委派 Prompt（Codex 預設 / pi 替代）
 
-模型與 reasoning 依 **Phase 0 使用者選定**，不使用本 skill 範例中的模型值。
+**Prompt 的本質：對一個 coding sub-agent 的完整任務委派書**——sub-agent 收到後獨立實作、自我測試、交付，中途不與使用者對話。模型與 reasoning 依 **Phase 0 使用者選定**，不使用本 skill 範例中的模型值。
 
-每個 Codex prompt 必須包含：
-- **角色**：「你是實作工程師，負責完整實作 <任務>」
+每個 coding sub-agent prompt 必須包含：
+- **角色**：「你是 coding sub-agent（實作工程師），負責完整實作 <任務>；你不規劃專案、不決定驗收標準、不做最終驗證——這些由 Hermes 裁定」
 - **範圍邊界**：明確說哪些檔案可改、哪些不可動
 - **read-first**：先讀現有程式碼確認實際屬性/型別/命名，再動手
 - **具體任務**：backlog item / 明確功能，非模糊目標
@@ -252,9 +255,11 @@ Herdr 模式安全規則：一律 `--current` 或明確 pane ID / agent 名稱�
 3. 修正後跑 L5 回歸確認所有路由/端點仍正常
 4. 記錄至 `docs/PITFALLS.md` 避免重複踩
 
-### 與分流模式的差異
+### 與 multi-stream 分流模式的差異（codex skill 特例）
 
-| | 分流模式（multi-stream） | 並行 sub-agent 模式 |
+> 分流模式（Hermes 寫 src、Codex 只寫 tests）定義於 `codex` skill `references/multi-stream-collaboration.md`，是補測試／技術債的特例——**不是**母版 `AGENT-CODEX.md` 的定義（母版＝Codex 寫全部 code，見「用途」節）。兩者對比：
+
+| | 分流模式（multi-stream，特例） | 並行 sub-agent 模式（本 skill） |
 |---|---|---|
 | Codex 職責 | 只寫 tests | 完整實作（src + tests） |
 | Hermes 職責 | 同時寫 src | 不寫 src，專注編排 + 驗證 |
