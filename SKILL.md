@@ -170,6 +170,55 @@ main (clean baseline)
 6. **逐個驗證** — 每個 Codex 退出後跑 L1–L4，通過後依序合併。
 7. **合併順序** — 先合併無共享檔案的分支；有共享檔案的分支最後合併，合併後立即檢查覆蓋。
 
+### 啟動方式二選一：terminal 模式 / Herdr 模式
+
+**A. terminal 模式（預設）** — 上列第 4 步用 `terminal(background=true, pty=true, workdir=<worktree>)`，定期 poll 輸出監控。
+
+**B. Herdr 模式（使用者要求以 Herdr 框架啟動時）** — 套用 `herdr` skill（先 `skill_view('herdr')` 載入完整命令參考）。
+
+前置硬閘門：
+
+```bash
+test "${HERDR_ENV:-}" = 1
+```
+
+- 通過 → Hermes 跑在 Herdr 管理的 pane 內，可用 herdr CLI 控制本 session，進入 Herdr 模式。
+- 不通過 → ⛔ 不得用 herdr 控制命令；退回 terminal 模式，並告知使用者：要以 Herdr 啟動需把 Hermes 跑在 Herdr pane 內（如 `herdrclaude`）。
+
+建立平行 pane（每個 sub-agent 一個 pane，同 tab 逐個 split）：
+
+```bash
+herdr pane split --current --direction right --cwd /tmp/stepN-a --no-focus
+```
+
+- 寬 pane 切 right、窄/高切 down，避免同向連切出窄欄；`--no-focus` 保留使用者焦點；`--cwd` 指向各 worktree。
+- 新 pane ID 從 `.result.pane.pane_id` 讀取，一律解析 JSON 回應，不從側欄順序推測。
+
+啟動執行者（兩種方式）：
+
+1. **批次模式**（與 terminal 模式等價，輸出可監控）：
+
+```bash
+herdr pane run <pane-id> "codex exec --model <Phase 0 選定模型> -c 'model_reasoning_effort=\"xhigh\"' --sandbox danger-full-access --skip-git-repo-check \"<prompt>\""
+herdr pane wait-output <pane-id> --match "tokens used" --timeout 600000
+herdr pane read <pane-id> --source recent-unwrapped --lines 200
+```
+
+2. **原生 agent 模式**（Herdr 認得 Codex 生命週期 idle/working/blocked/done）：
+
+```bash
+herdr agent start stepN-a --kind codex --pane <pane-id>
+herdr agent prompt stepN-a "<prompt>" --wait --timeout 120000
+herdr agent get stepN-a
+herdr agent read stepN-a --source recent-unwrapped --lines 200
+```
+
+- `agent start` 前 pane 必須是空 shell interactive prompt；先用 `herdr agent` 確認本機支援的 kind 清單。
+- `blocked` = agent 卡在 approval/問題 UI → `agent read` 檢查後問使用者，勿代答。
+- pi 執行者同理：批次用 `pane run "pi -p ..."`；pi 非 Herdr 原生 kind 時走批次模式。
+
+Herdr 模式安全規則：一律 `--current` 或明確 pane ID / agent 名稱；不關閉非自己建立的 workspace/tab/pane；不跑 `herdr server stop`；不殺 Herdr 主程序。
+
 ### 共享檔案合併覆蓋防護 ★
 
 多個 sub-agent 各自實作時，**共享檔案**（如 `Program.cs`、路由註冊、DI 設定）容易被後合併的分支覆蓋。
@@ -264,6 +313,8 @@ Codex spawn 執行期間，Hermes 不得只等 notify_on_complete——要主動
 3. **全員完成整合檢查** — 並行 sub-agent 全部退出後，先確認每個 worktree 的完成狀態（有無未 commit 產出、是否標記 UNVERIFIED），確認沒有任何 agent 仍在執行，才開始依序合併。
 4. **執行記錄落盤（EOR/ESR）** — 每個 Codex 任務結束後寫入執行記錄檔（如 `docs/exec/<task-id>.md`），固定欄位：任務 ID、修改檔案清單、自我測試指令與結果、UNVERIFIED 項目、capacity/卡死事件、接手人與處理方式。跨 session 可追溯事實；PITFALLS.md 只記教訓，EOR 記事實。
 
+**Herdr 模式下的監控**：poll 來源改用 `pane read`（批次模式）或 `agent get` 的生命週期狀態（原生 agent 模式）——`idle`/`done` 是完成信號，`blocked` 是卡在審批的信號，`unknown` 不代表完成；卡死閾值同上，卡住時可用 `herdr agent send-keys <name> ctrl+c` 中斷後走 capacity 接手流程。
+
 ## Model Capacity 處理
 
 `gpt-5.6-luna` 等模型可能因 **capacity 不足** exit 1，但已產出部分檔案。這與 token 耗盡不同：
@@ -334,6 +385,8 @@ pi -p --provider ollama --model deepseek-v4-flash:0731-cloud --thinking xhigh \
 - **capacity 不足** — exit 1 但可能已產出部分檔案；先檢查再決定接手或重試，同一目的最多重試一次。
 - **共享檔案覆蓋** — 並行 sub-agent 合併時，後合併分支可能覆蓋先合併分支的共享檔案內容；合併後必檢查。
 - **失敗斷路器** — 同一目的最多重試一次替代方法；二次仍失敗 → Hermes 完全接手，不反覆重試。
+- **HERDR_ENV 未設卻跑 herdr 控制命令** — Hermes 不在 Herdr pane 內時，herdr CLI 無法控制 session（甚至污染使用者自己的 session）；Herdr 模式前必先 `test "${HERDR_ENV:-}" = 1`，不通過退回 terminal 模式。
+- **pane 與 agent 混用** — pane 是原始終端、agent 是 Herdr 認得生命週期的 coding agent；需要 blocked/idle/done 偵測就用 `agent start` + `agent prompt`，否則用 `pane run` 批次；`agent start` 不會自己建 pane。
 - **卡死未偵測** — Codex 掛住不退出（無新輸出）時若只等 notify_on_complete，會空等數小時；必須定期 poll 輸出並設定卡死閾值。
 - **計劃與執行同回合** — 呈現計劃的同時 spawn/write prompt，使用者來不及批准；計劃呈現與執行必須不同回合。
 - **未問模型即啟動** — 跳過 Phase 0 模型選擇 Gate，依 skill 記載的預設模型直接 spawn；每次 skill 觸發都必須先以 clarify 詢問使用者本次執行者模型與 reasoning。
